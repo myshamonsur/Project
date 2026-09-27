@@ -1,0 +1,1670 @@
+#include <GL/freeglut.h>
+#include <cmath>
+#include <cstdlib>
+
+const float PI = 3.14159265359f;
+
+float t = 0.0f;
+
+// ============================================================
+// CAMERA
+// ============================================================
+
+float camX = 0.0f;
+float camY = 7.0f;
+float camZ = 27.0f;
+
+bool autoCamera = true;
+bool evening = false;
+
+
+// ============================================================
+// BASIC FUNCTIONS
+// ============================================================
+
+float rad(float d)
+{
+    return d * PI / 180.0f;
+}
+
+void setColor(float r, float g, float b)
+{
+    glColor3f(r, g, b);
+}
+
+void sphere(float x, float y, float z,
+            float sx, float sy, float sz)
+{
+    glPushMatrix();
+
+    glTranslatef(x, y, z);
+    glScalef(sx, sy, sz);
+
+    glutSolidSphere(1.0, 20, 16);
+
+    glPopMatrix();
+}
+
+void cube(float x, float y, float z,
+          float sx, float sy, float sz)
+{
+    glPushMatrix();
+
+    glTranslatef(x, y, z);
+    glScalef(sx, sy, sz);
+
+    glutSolidCube(1.0);
+
+    glPopMatrix();
+}
+
+void cylinder(float x, float y, float z,
+              float radius, float height)
+{
+    GLUquadric *q = gluNewQuadric();
+
+    glPushMatrix();
+
+    glTranslatef(x, y, z);
+
+    // GLU cylinders are created along the local +Z axis.
+    // Rotate them so their length follows the world's +Y axis.
+    glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
+
+    gluCylinder(q,
+                radius,
+                radius * 0.88f,
+                height,
+                18,
+                10);
+
+    glPopMatrix();
+
+    gluDeleteQuadric(q);
+}
+
+
+// ============================================================
+// SKY
+// ============================================================
+
+void drawSky()
+{
+    glDisable(GL_LIGHTING);
+
+    if (!evening)
+        setColor(0.42f, 0.74f, 0.97f);
+    else
+        setColor(0.20f, 0.20f, 0.40f);
+
+    cube(0, 18, -40,
+         100, 50, 1);
+
+    glEnable(GL_LIGHTING);
+}
+
+
+// ============================================================
+// SUN
+// ============================================================
+
+void drawSun()
+{
+    glDisable(GL_LIGHTING);
+
+    if (!evening)
+    {
+        setColor(1.0f, 0.82f, 0.15f);
+
+        sphere(18, 19, -28,
+               2.2f, 2.2f, 2.2f);
+    }
+    else
+    {
+        setColor(0.95f, 0.90f, 0.65f);
+
+        sphere(16, 18, -28,
+               1.8f, 1.8f, 1.8f);
+    }
+
+    glEnable(GL_LIGHTING);
+}
+
+
+// ============================================================
+// CLOUD
+// ============================================================
+
+void drawCloud(float x, float y, float z, float s)
+{
+    glDisable(GL_LIGHTING);
+
+    setColor(0.97f, 0.98f, 1.0f);
+
+    sphere(x, y, z,
+           2.0f*s,
+           0.8f*s,
+           0.8f*s);
+
+    sphere(x + 1.7f*s,
+           y + 0.2f*s,
+           z,
+           1.4f*s,
+           0.7f*s,
+           0.7f*s);
+
+    sphere(x - 1.6f*s,
+           y + 0.1f*s,
+           z,
+           1.3f*s,
+           0.65f*s,
+           0.65f*s);
+
+    sphere(x + 0.4f*s,
+           y + 0.5f*s,
+           z,
+           1.3f*s,
+           0.8f*s,
+           0.7f*s);
+
+    glEnable(GL_LIGHTING);
+}
+
+void drawClouds()
+{
+    float m1 = fmod(t * 0.025f, 65.0f);
+    float m2 = fmod(t * 0.018f, 70.0f);
+
+    drawCloud(-32 + m1,
+              17,
+              -25,
+              1.1f);
+
+    drawCloud(-5 + m2,
+              15,
+              -30,
+              0.9f);
+
+    drawCloud(20 + m1,
+              19,
+              -35,
+              1.2f);
+}
+
+
+// ============================================================
+// GROUND
+// ============================================================
+
+void drawGround()
+{
+    glDisable(GL_LIGHTING);
+
+    setColor(0.15f, 0.48f, 0.12f);
+
+    glBegin(GL_QUADS);
+
+    glVertex3f(-45, 0, -35);
+    glVertex3f(45, 0, -35);
+    glVertex3f(45, 0, 35);
+    glVertex3f(-45, 0, 35);
+
+    glEnd();
+
+    glEnable(GL_LIGHTING);
+}
+
+
+// ============================================================
+// RIVER
+// ============================================================
+
+void drawRiver()
+{
+    glDisable(GL_LIGHTING);
+
+    setColor(0.04f, 0.36f, 0.70f);
+
+    glBegin(GL_QUADS);
+
+    glVertex3f(-45, 0.035f, -5);
+    glVertex3f(45, 0.035f, -5);
+    glVertex3f(45, 0.035f, 5);
+    glVertex3f(-45, 0.035f, 5);
+
+    glEnd();
+
+    // Moving water waves
+    glLineWidth(2.0f);
+
+    for (int x = -40; x < 40; x += 4)
+    {
+        for (int z = -4; z <= 4; z += 2)
+        {
+            float wave =
+                sin(t * 0.12f +
+                    x * 0.5f +
+                    z) * 0.35f;
+
+            setColor(0.38f,
+                     0.75f,
+                     0.94f);
+
+            glBegin(GL_LINES);
+
+            glVertex3f(x + wave,
+                       0.08f,
+                       z);
+
+            glVertex3f(x + 1.8f + wave,
+                       0.08f,
+                       z + 0.12f);
+
+            glEnd();
+        }
+    }
+
+    glEnable(GL_LIGHTING);
+}
+
+
+// ============================================================
+// GRASS
+// ============================================================
+
+void grassBlade(float x,
+                float z,
+                float h)
+{
+    float wind =
+        sin(t * 0.08f +
+            x * 0.7f +
+            z * 0.5f) * 0.25f;
+
+    glDisable(GL_LIGHTING);
+
+    setColor(0.04f,
+             0.30f,
+             0.04f);
+
+    glBegin(GL_TRIANGLES);
+
+    glVertex3f(x,
+               0.02f,
+               z);
+
+    glVertex3f(x - 0.08f + wind,
+               h,
+               z);
+
+    glVertex3f(x + 0.10f,
+               0.02f,
+               z);
+
+    glEnd();
+
+    glEnable(GL_LIGHTING);
+}
+
+void drawGrass()
+{
+    for (int x = -40; x <= 40; x += 2)
+    {
+        for (int z = 8; z <= 28; z += 2)
+        {
+            grassBlade(
+                x + sin(x * 2.0f) * 0.2f,
+                z,
+                0.5f +
+                fabs(sin(x * z)) * 0.35f
+            );
+        }
+    }
+
+    // River side grass
+    for (int x = -40; x <= 40; x += 1)
+    {
+        grassBlade(x, -6.0f, 0.8f);
+        grassBlade(x, 6.0f, 0.8f);
+    }
+}
+
+
+// ============================================================
+// BIRD
+// Bird is positioned directly ON a branch
+// ============================================================
+
+void drawBirdOnBranch(float x,
+                      float y,
+                      float z,
+                      float scale)
+{
+    glDisable(GL_LIGHTING);
+
+    // Body
+    setColor(0.08f,
+             0.08f,
+             0.10f);
+
+    sphere(x,
+           y,
+           z,
+           0.28f*scale,
+           0.20f*scale,
+           0.18f*scale);
+
+    // Head
+    sphere(x + 0.25f*scale,
+           y + 0.10f*scale,
+           z,
+           0.17f*scale,
+           0.17f*scale,
+           0.15f*scale);
+
+    // Beak
+    setColor(0.85f,
+             0.55f,
+             0.08f);
+
+    sphere(x + 0.42f*scale,
+           y + 0.09f*scale,
+           z,
+           0.10f*scale,
+           0.06f*scale,
+           0.06f*scale);
+
+    // Wings
+    setColor(0.05f,
+             0.05f,
+             0.07f);
+
+    sphere(x - 0.03f*scale,
+           y + 0.02f*scale,
+           z + 0.17f*scale,
+           0.22f*scale,
+           0.08f*scale,
+           0.15f*scale);
+
+    sphere(x - 0.03f*scale,
+           y + 0.02f*scale,
+           z - 0.17f*scale,
+           0.22f*scale,
+           0.08f*scale,
+           0.15f*scale);
+
+    // Tiny legs
+    setColor(0.35f,
+             0.22f,
+             0.08f);
+
+    cylinder(x - 0.08f*scale,
+             y - 0.20f*scale,
+             z + 0.06f*scale,
+             0.025f*scale,
+             0.16f*scale);
+
+    cylinder(x - 0.08f*scale,
+             y - 0.20f*scale,
+             z - 0.06f*scale,
+             0.025f*scale,
+             0.16f*scale);
+
+    glEnable(GL_LIGHTING);
+}
+
+
+// ============================================================
+// IMPROVED TREE
+// ============================================================
+
+void drawTree(float x,
+              float z,
+              float s,
+              bool birdOnTree)
+{
+    // --------------------------------------------------------
+    // IMPORTANT:
+    // Trunk starts exactly from ground level (Y = 0)
+    // and reaches the branch area.
+    // --------------------------------------------------------
+
+    float trunkHeight = 5.2f * s;
+
+    // Wind movement
+    float wind =
+        sin(t * 0.06f + x * 0.2f) * 4.0f;
+
+    glDisable(GL_LIGHTING);
+
+    // --------------------------------------------------------
+    // TRUNK
+    // --------------------------------------------------------
+
+    setColor(0.30f,
+             0.13f,
+             0.045f);
+
+    // Main trunk
+    cylinder(x,
+             0.0f,
+             z,
+             0.42f*s,
+             trunkHeight);
+
+    // Slight wider base
+    setColor(0.25f,
+             0.10f,
+             0.035f);
+
+    sphere(x,
+           0.25f,
+           z,
+           0.58f*s,
+           0.28f*s,
+           0.58f*s);
+
+    // --------------------------------------------------------
+    // MAIN BRANCHES
+    // --------------------------------------------------------
+
+    setColor(0.25f,
+             0.10f,
+             0.035f);
+
+    // Left branch
+    glPushMatrix();
+
+    glTranslatef(x,
+                 trunkHeight - 0.2f*s,
+                 z);
+
+    glRotatef(-38 + wind*0.15f,
+              0,
+              0,
+              1);
+
+    cylinder(0,
+             0,
+             0,
+             0.16f*s,
+             2.4f*s);
+
+    glPopMatrix();
+
+    // Right branch
+    glPushMatrix();
+
+    glTranslatef(x,
+                 trunkHeight - 0.1f*s,
+                 z);
+
+    glRotatef(38 + wind*0.15f,
+              0,
+              0,
+              1);
+
+    cylinder(0,
+             0,
+             0,
+             0.16f*s,
+             2.4f*s);
+
+    glPopMatrix();
+
+    // --------------------------------------------------------
+    // LEAF CANOPY
+    // --------------------------------------------------------
+
+    setColor(0.035f,
+             0.30f,
+             0.07f);
+
+    float topY =
+        trunkHeight + 1.7f*s;
+
+    sphere(x - 1.45f*s,
+           topY - 0.7f*s,
+           z,
+           1.65f*s,
+           1.45f*s,
+           1.50f*s);
+
+    sphere(x + 1.45f*s,
+           topY - 0.65f*s,
+           z,
+           1.65f*s,
+           1.45f*s,
+           1.50f*s);
+
+    sphere(x,
+           topY,
+           z,
+           2.0f*s,
+           1.7f*s,
+           1.75f*s);
+
+    // --------------------------------------------------------
+    // MOVING LEAVES
+    // --------------------------------------------------------
+
+    setColor(0.10f,
+             0.46f,
+             0.10f);
+
+    for (int i = 0; i < 12; i++)
+    {
+        float a = i * 30.0f;
+
+        float movement =
+            sin(t * 0.08f + i) * 0.25f;
+
+        float lx =
+            x +
+            cos(rad(a))*1.9f*s +
+            movement;
+
+        float ly =
+            topY -
+            0.2f*s +
+            sin(rad(a))*0.9f;
+
+        float lz =
+            z +
+            sin(rad(a))*1.45f*s;
+
+        sphere(lx,
+               ly,
+               lz,
+               0.28f*s,
+               0.22f*s,
+               0.25f*s);
+    }
+
+    // --------------------------------------------------------
+    // BIRD PERCHED ON BRANCH
+    // --------------------------------------------------------
+
+    if (birdOnTree)
+    {
+        /*
+           Bird position is calculated from the right branch.
+           So it will visually sit on the branch instead of
+           floating in the air.
+        */
+
+        float branchX =
+            x + 1.15f*s;
+
+        float branchY =
+            trunkHeight + 0.85f*s;
+
+        float branchZ =
+            z;
+
+        drawBirdOnBranch(
+            branchX,
+            branchY + 0.22f*s,
+            branchZ,
+            s
+        );
+    }
+
+    glEnable(GL_LIGHTING);
+}
+
+
+// ============================================================
+// DEER
+// ============================================================
+
+void drawDeer(float x,
+              float z,
+              float s)
+{
+    float grazing =
+        (sin(t * 0.08f + x) + 1.0f)
+        / 2.0f;
+
+    float headY =
+        2.35f -
+        grazing * 1.0f;
+
+    glDisable(GL_LIGHTING);
+
+    // Body
+    setColor(0.50f,
+             0.22f,
+             0.06f);
+
+    sphere(x,
+           1.35f,
+           z,
+           1.5f*s,
+           0.75f*s,
+           0.65f*s);
+
+    // Neck
+    cylinder(x + 1.0f*s,
+             1.5f,
+             z,
+             0.30f*s,
+             1.4f*s);
+
+    // Head
+    sphere(x + 1.75f*s,
+           headY,
+           z,
+           0.65f*s,
+           0.50f*s,
+           0.50f*s);
+
+    // Nose
+    setColor(0.12f,
+             0.05f,
+             0.02f);
+
+    sphere(x + 2.25f*s,
+           headY - 0.1f,
+           z,
+           0.20f*s,
+           0.18f*s,
+           0.18f*s);
+
+    // Legs
+    setColor(0.42f,
+             0.17f,
+             0.04f);
+
+    float walk =
+        sin(t * 0.12f) * 0.15f;
+
+    for (int i = -1; i <= 1; i += 2)
+    {
+        glPushMatrix();
+
+        glTranslatef(x + i*0.75f*s,
+                     0.35f,
+                     z - 0.30f*s);
+
+        glRotatef(i*walk*20,
+                  1,0,0);
+
+        cylinder(0,0,0,
+                 0.11f*s,
+                 1.1f*s);
+
+        glPopMatrix();
+
+        glPushMatrix();
+
+        glTranslatef(x + i*0.75f*s,
+                     0.35f,
+                     z + 0.30f*s);
+
+        glRotatef(-i*walk*20,
+                  1,0,0);
+
+        cylinder(0,0,0,
+                 0.11f*s,
+                 1.1f*s);
+
+        glPopMatrix();
+    }
+
+    // Antlers
+    setColor(0.20f,
+             0.09f,
+             0.025f);
+
+    glPushMatrix();
+
+    glTranslatef(x + 1.55f*s,
+                 headY + 0.45f*s,
+                 z + 0.15f*s);
+
+    glRotatef(35,
+              0,0,1);
+
+    cylinder(0,0,0,
+             0.055f*s,
+             0.8f*s);
+
+    glPopMatrix();
+
+    glPushMatrix();
+
+    glTranslatef(x + 1.55f*s,
+                 headY + 0.45f*s,
+                 z - 0.15f*s);
+
+    glRotatef(35,
+              0,0,1);
+
+    cylinder(0,0,0,
+             0.055f*s,
+             0.8f*s);
+
+    glPopMatrix();
+
+    glEnable(GL_LIGHTING);
+}
+
+
+// ============================================================
+// GOAT
+// ============================================================
+
+void drawGoat(float x,
+              float z,
+              float s)
+{
+    float grazing =
+        (sin(t * 0.13f + x) + 1.0f)
+        / 2.0f;
+
+    float headY =
+        1.9f -
+        grazing * 1.15f;
+
+    glDisable(GL_LIGHTING);
+
+    // Body
+    setColor(0.88f,
+             0.87f,
+             0.80f);
+
+    sphere(x,
+           1.15f,
+           z,
+           1.25f*s,
+           0.70f*s,
+           0.65f*s);
+
+    // Neck
+    cylinder(x + 0.75f*s,
+             1.25f,
+             z,
+             0.28f*s,
+             1.0f*s);
+
+    // Head
+    sphere(x + 1.35f*s,
+           headY,
+           z,
+           0.58f*s,
+           0.48f*s,
+           0.48f*s);
+
+    // Ears
+    setColor(0.65f,
+             0.60f,
+             0.55f);
+
+    sphere(x + 1.35f*s,
+           headY + 0.25f,
+           z + 0.35f*s,
+           0.30f*s,
+           0.10f*s,
+           0.16f*s);
+
+    sphere(x + 1.35f*s,
+           headY + 0.25f,
+           z - 0.35f*s,
+           0.30f*s,
+           0.10f*s,
+           0.16f*s);
+
+    // Legs
+    setColor(0.48f,
+             0.45f,
+             0.40f);
+
+    for (int i = -1; i <= 1; i += 2)
+    {
+        cylinder(x + i*0.65f*s,
+                 0.2f,
+                 z - 0.3f*s,
+                 0.10f*s,
+                 0.9f*s);
+
+        cylinder(x + i*0.65f*s,
+                 0.2f,
+                 z + 0.3f*s,
+                 0.10f*s,
+                 0.9f*s);
+    }
+
+    // Horns
+    setColor(0.20f,
+             0.15f,
+             0.10f);
+
+    cylinder(x + 1.2f*s,
+             headY + 0.5f,
+             z + 0.16f*s,
+             0.045f*s,
+             0.35f*s);
+
+    cylinder(x + 1.2f*s,
+             headY + 0.5f,
+             z - 0.16f*s,
+             0.045f*s,
+             0.35f*s);
+
+    glEnable(GL_LIGHTING);
+}
+
+
+// ============================================================
+// SHEPHERD BOY
+// ============================================================
+
+void drawShepherd()
+{
+    float x = -7.0f;
+    float z = 10.0f;
+
+    glDisable(GL_LIGHTING);
+
+    // Legs
+    setColor(0.12f,
+             0.16f,
+             0.22f);
+
+    glPushMatrix();
+
+    glTranslatef(x - 0.35f,
+                 0.65f,
+                 z);
+
+    glRotatef(-65,
+              0,0,1);
+
+    cylinder(0,0,0,
+             0.17f,
+             1.35f);
+
+    glPopMatrix();
+
+    glPushMatrix();
+
+    glTranslatef(x + 0.35f,
+                 0.65f,
+                 z);
+
+    glRotatef(65,
+              0,0,1);
+
+    cylinder(0,0,0,
+             0.17f,
+             1.35f);
+
+    glPopMatrix();
+
+    // Body
+    setColor(0.10f,
+             0.25f,
+             0.60f);
+
+    sphere(x,
+           1.55f,
+           z,
+           0.62f,
+           0.90f,
+           0.45f);
+
+    // Head
+    setColor(0.68f,
+             0.40f,
+             0.24f);
+
+    sphere(x,
+           2.65f,
+           z,
+           0.46f,
+           0.48f,
+           0.42f);
+
+    // Hair
+    setColor(0.05f,
+             0.025f,
+             0.01f);
+
+    sphere(x,
+           2.95f,
+           z,
+           0.48f,
+           0.24f,
+           0.43f);
+
+    // Hat
+    setColor(0.42f,
+             0.25f,
+             0.07f);
+
+    cylinder(x,
+             3.10f,
+             z,
+             0.55f,
+             0.16f);
+
+    // Arms
+    setColor(0.68f,
+             0.40f,
+             0.24f);
+
+    glPushMatrix();
+
+    glTranslatef(x - 0.5f,
+                 1.85f,
+                 z);
+
+    glRotatef(-55,
+              0,0,1);
+
+    cylinder(0,0,0,
+             0.12f,
+             0.9f);
+
+    glPopMatrix();
+
+    glPushMatrix();
+
+    glTranslatef(x + 0.5f,
+                 1.85f,
+                 z);
+
+    glRotatef(55,
+              0,0,1);
+
+    cylinder(0,0,0,
+             0.12f,
+             0.9f);
+
+    glPopMatrix();
+
+    // Shepherd stick
+    setColor(0.28f,
+             0.12f,
+             0.035f);
+
+    glPushMatrix();
+
+    glTranslatef(x + 0.95f,
+                 0.1f,
+                 z + 0.25f);
+
+    glRotatef(-8,
+              0,0,1);
+
+    cylinder(0,0,0,
+             0.055f,
+             3.3f);
+
+    glPopMatrix();
+
+    glEnable(GL_LIGHTING);
+}
+
+
+// ============================================================
+// FLYING BIRDS
+// ============================================================
+
+void flyingBird(float x,
+                float y,
+                float z)
+{
+    float flap =
+        sin(t * 0.3f + x) * 0.5f;
+
+    glDisable(GL_LIGHTING);
+
+    setColor(0.05f,
+             0.05f,
+             0.06f);
+
+    glLineWidth(3);
+
+    glBegin(GL_LINES);
+
+    glVertex3f(x,y,z);
+
+    glVertex3f(x - 0.7f,
+               y + flap,
+               z);
+
+    glVertex3f(x,y,z);
+
+    glVertex3f(x + 0.7f,
+               y + flap,
+               z);
+
+    glEnd();
+
+    glEnable(GL_LIGHTING);
+}
+
+void drawFlyingBirds()
+{
+    float bx =
+        fmod(t * 0.08f, 50.0f) - 25.0f;
+
+    flyingBird(bx,
+               14,
+               -10);
+
+    flyingBird(bx + 4,
+               15,
+               -12);
+
+    flyingBird(bx + 8,
+               13.5f,
+               -15);
+}
+
+
+// ============================================================
+// BUTTERFLY
+// ============================================================
+
+void butterfly(float x,
+                float y,
+                float z)
+{
+    float flap =
+        sin(t * 0.5f) * 0.12f;
+
+    glDisable(GL_LIGHTING);
+
+    setColor(0.90f,
+             0.25f,
+             0.35f);
+
+    sphere(x - 0.18f,
+           y + flap,
+           z,
+           0.18f,
+           0.12f,
+           0.04f);
+
+    sphere(x + 0.18f,
+           y - flap,
+           z,
+           0.18f,
+           0.12f,
+           0.04f);
+
+    setColor(0.05f,
+             0.03f,
+             0.02f);
+
+    sphere(x,y,z,
+           0.05f,
+           0.10f,
+           0.05f);
+
+    glEnable(GL_LIGHTING);
+}
+
+
+// ============================================================
+// ROCKS
+// ============================================================
+
+void rock(float x,
+          float z,
+          float s)
+{
+    glDisable(GL_LIGHTING);
+
+    setColor(0.30f,
+             0.30f,
+             0.25f);
+
+    sphere(x,
+           0.25f,
+           z,
+           s,
+           s*0.45f,
+           s*0.75f);
+
+    glEnable(GL_LIGHTING);
+}
+
+void drawRocks()
+{
+    rock(-15,-5.3f,0.5f);
+    rock(-8,-5.5f,0.35f);
+    rock(5,-5.4f,0.45f);
+    rock(15,-5.3f,0.5f);
+
+    rock(-18,5.4f,0.4f);
+    rock(10,5.3f,0.5f);
+    rock(20,5.4f,0.35f);
+}
+
+
+
+// ============================================================
+// ANIMATED WINDMILL
+// ============================================================
+
+void drawWindmill()
+{
+    // Place the windmill on the far side of the meadow.
+    const float wx = 22.0f;
+    const float wz = 27.0f;
+    const float towerHeight = 6.8f;
+    const float rotorY = 7.25f;
+
+    glDisable(GL_LIGHTING);
+
+    // Tapered tower starts exactly at ground level.
+    setColor(0.78f, 0.72f, 0.58f);
+    cylinder(wx, 0.0f, wz, 0.72f, towerHeight);
+
+    // Dark doorway on the front of the tower.
+    setColor(0.25f, 0.16f, 0.09f);
+    cube(wx, 0.95f, wz + 0.69f, 0.48f, 1.75f, 0.08f);
+
+    // Small roof / cap behind the rotor.
+    setColor(0.48f, 0.24f, 0.10f);
+    sphere(wx, rotorY, wz, 0.62f, 0.48f, 0.55f);
+
+    // Rotating four-blade rotor in the X-Y plane.
+    glPushMatrix();
+    glTranslatef(wx, rotorY, wz + 0.62f);
+    glRotatef(t * 0.8f, 0.0f, 0.0f, 1.0f);
+
+    for (int i = 0; i < 4; ++i)
+    {
+        glPushMatrix();
+        glRotatef(i * 90.0f, 0.0f, 0.0f, 1.0f);
+
+        // Each blade extends upward from the central hub.
+        setColor(0.90f, 0.86f, 0.72f);
+        cube(0.0f, 1.55f, 0.0f, 0.28f, 2.75f, 0.16f);
+
+        // Darker blade tip for a more defined silhouette.
+        setColor(0.55f, 0.31f, 0.13f);
+        cube(0.0f, 2.78f, 0.015f, 0.30f, 0.28f, 0.18f);
+
+        glPopMatrix();
+    }
+
+    // Central hub remains fixed to the rotating blades.
+    setColor(0.35f, 0.20f, 0.10f);
+    sphere(0.0f, 0.0f, 0.04f, 0.34f, 0.34f, 0.25f);
+
+    glPopMatrix();
+
+    glEnable(GL_LIGHTING);
+}
+
+// ============================================================
+// COMPLETE SCENE
+// ============================================================
+
+void drawScene()
+{
+    drawSky();
+
+    drawSun();
+
+    drawClouds();
+
+    drawGround();
+
+    drawRiver();
+
+    drawGrass();
+
+    drawRocks();
+
+    // Animated windmill
+    drawWindmill();
+
+    // --------------------------------------------------------
+    // TREES
+    // --------------------------------------------------------
+
+    drawTree(-25,-1,1.35f,true);
+
+    drawTree(-18,14,1.10f,true);
+
+    drawTree(-10,21,1.25f,false);
+
+    drawTree(13,16,1.40f,true);
+
+    drawTree(23,-1,1.30f,false);
+
+    drawTree(30,20,1.10f,true);
+
+    drawTree(-32,25,0.95f,false);
+
+    drawTree(33,8,1.00f,false);
+
+    // --------------------------------------------------------
+    // ANIMALS
+    // --------------------------------------------------------
+
+    drawDeer(5,13,1.0f);
+
+    drawGoat(-1,14,0.85f);
+
+    drawGoat(3,16,0.75f);
+
+    // --------------------------------------------------------
+    // SHEPHERD
+    // --------------------------------------------------------
+
+    drawShepherd();
+
+    // --------------------------------------------------------
+    // FLYING BIRDS
+    // --------------------------------------------------------
+
+    drawFlyingBirds();
+
+    // --------------------------------------------------------
+    // BUTTERFLIES
+    // --------------------------------------------------------
+
+    float bx1 =
+        -8 +
+        sin(t * 0.05f) * 5;
+
+    float bz1 =
+        12 +
+        cos(t * 0.04f) * 4;
+
+    butterfly(
+        bx1,
+        2.5f + sin(t*0.12f),
+        bz1
+    );
+
+    float bx2 =
+        7 +
+        cos(t * 0.04f) * 5;
+
+    float bz2 =
+        17 +
+        sin(t * 0.05f) * 3;
+
+    butterfly(
+        bx2,
+        3.0f + cos(t*0.15f),
+        bz2
+    );
+}
+
+
+// ============================================================
+// LIGHTING
+// ============================================================
+
+void setupLighting()
+{
+    glEnable(GL_LIGHTING);
+
+    glEnable(GL_LIGHT0);
+
+    GLfloat position[] =
+    {
+        10.0f,
+        20.0f,
+        10.0f,
+        1.0f
+    };
+
+    GLfloat ambientDay[] =
+    {
+        0.45f,
+        0.45f,
+        0.45f,
+        1.0f
+    };
+
+    GLfloat ambientEvening[] =
+    {
+        0.20f,
+        0.18f,
+        0.30f,
+        1.0f
+    };
+
+    GLfloat diffuseDay[] =
+    {
+        1.0f,
+        0.95f,
+        0.80f,
+        1.0f
+    };
+
+    GLfloat diffuseEvening[] =
+    {
+        0.40f,
+        0.35f,
+        0.60f,
+        1.0f
+    };
+
+    glLightfv(GL_LIGHT0,
+              GL_POSITION,
+              position);
+
+    if (!evening)
+    {
+        glLightfv(GL_LIGHT0,
+                  GL_AMBIENT,
+                  ambientDay);
+
+        glLightfv(GL_LIGHT0,
+                  GL_DIFFUSE,
+                  diffuseDay);
+    }
+    else
+    {
+        glLightfv(GL_LIGHT0,
+                  GL_AMBIENT,
+                  ambientEvening);
+
+        glLightfv(GL_LIGHT0,
+                  GL_DIFFUSE,
+                  diffuseEvening);
+    }
+
+    glEnable(GL_COLOR_MATERIAL);
+
+    glColorMaterial(
+        GL_FRONT,
+        GL_AMBIENT_AND_DIFFUSE
+    );
+}
+
+
+// ============================================================
+// DISPLAY
+// ============================================================
+
+void display()
+{
+    glClear(
+        GL_COLOR_BUFFER_BIT |
+        GL_DEPTH_BUFFER_BIT
+    );
+
+    glMatrixMode(GL_MODELVIEW);
+
+    glLoadIdentity();
+
+    gluLookAt(
+        camX,
+        camY,
+        camZ,
+
+        0.0f,
+        3.5f,
+        0.0f,
+
+        0.0f,
+        1.0f,
+        0.0f
+    );
+
+    setupLighting();
+
+    drawScene();
+
+    glutSwapBuffers();
+}
+
+
+// ============================================================
+// ANIMATION
+// ============================================================
+
+void update(int value)
+{
+    t += 1.0f;
+
+    if (autoCamera)
+    {
+        camX =
+            sin(t * 0.0015f) * 5.0f;
+
+        camZ =
+            27.0f +
+            cos(t * 0.0015f) * 3.0f;
+
+        camY =
+            7.0f +
+            sin(t * 0.002f) * 0.5f;
+    }
+
+    glutPostRedisplay();
+
+    glutTimerFunc(
+        16,
+        update,
+        0
+    );
+}
+
+
+// ============================================================
+// KEYBOARD
+// ============================================================
+
+void keyboard(unsigned char key,
+              int x,
+              int y)
+{
+    switch(key)
+    {
+        case 27:
+            exit(0);
+            break;
+
+        case 'w':
+        case 'W':
+            camZ -= 1.0f;
+            autoCamera = false;
+            break;
+
+        case 's':
+        case 'S':
+            camZ += 1.0f;
+            autoCamera = false;
+            break;
+
+        case 'a':
+        case 'A':
+            camX -= 1.0f;
+            autoCamera = false;
+            break;
+
+        case 'd':
+        case 'D':
+            camX += 1.0f;
+            autoCamera = false;
+            break;
+
+        case 'q':
+        case 'Q':
+            camY += 1.0f;
+            autoCamera = false;
+            break;
+
+        case 'e':
+        case 'E':
+            camY -= 1.0f;
+            autoCamera = false;
+            break;
+
+        case 'c':
+        case 'C':
+            autoCamera = !autoCamera;
+            break;
+
+        case 'n':
+        case 'N':
+            evening = !evening;
+            break;
+
+        case 'r':
+        case 'R':
+            camX = 0;
+            camY = 7;
+            camZ = 27;
+            autoCamera = true;
+            break;
+    }
+
+    glutPostRedisplay();
+}
+
+
+// ============================================================
+// SPECIAL KEYS
+// ============================================================
+
+void specialKeys(int key,
+                 int x,
+                 int y)
+{
+    autoCamera = false;
+
+    if(key == GLUT_KEY_UP)
+        camZ -= 1.0f;
+
+    if(key == GLUT_KEY_DOWN)
+        camZ += 1.0f;
+
+    if(key == GLUT_KEY_LEFT)
+        camX -= 1.0f;
+
+    if(key == GLUT_KEY_RIGHT)
+        camX += 1.0f;
+
+    glutPostRedisplay();
+}
+
+
+// ============================================================
+// RESHAPE
+// ============================================================
+
+void reshape(int width,
+             int height)
+{
+    if(height == 0)
+        height = 1;
+
+    glViewport(
+        0,
+        0,
+        width,
+        height
+    );
+
+    glMatrixMode(
+        GL_PROJECTION
+    );
+
+    glLoadIdentity();
+
+    gluPerspective(
+        55.0,
+        (double)width /
+        (double)height,
+        0.1,
+        150.0
+    );
+
+    glMatrixMode(
+        GL_MODELVIEW
+    );
+}
+
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+
+void init()
+{
+    glClearColor(
+        0.42f,
+        0.74f,
+        0.97f,
+        1.0f
+    );
+
+    glEnable(GL_DEPTH_TEST);
+
+    glDepthFunc(GL_LEQUAL);
+
+    glShadeModel(GL_SMOOTH);
+
+    glEnable(GL_NORMALIZE);
+
+    glHint(
+        GL_PERSPECTIVE_CORRECTION_HINT,
+        GL_NICEST
+    );
+}
+
+
+// ============================================================
+// MAIN
+// ============================================================
+
+int main(int argc,
+         char** argv)
+{
+    glutInit(&argc, argv);
+
+    glutInitDisplayMode(
+        GLUT_DOUBLE |
+        GLUT_RGB |
+        GLUT_DEPTH
+    );
+
+    glutInitWindowSize(
+        1280,
+        720
+    );
+
+    glutInitWindowPosition(
+        80,
+        40
+    );
+
+    glutCreateWindow(
+        "3D Natural Village Animation"
+    );
+
+    init();
+
+    glutDisplayFunc(display);
+
+    glutReshapeFunc(reshape);
+
+    glutKeyboardFunc(keyboard);
+
+    glutSpecialFunc(specialKeys);
+
+    glutTimerFunc(
+        0,
+        update,
+        0
+    );
+
+    glutMainLoop();
+
+    return 0;
+}
